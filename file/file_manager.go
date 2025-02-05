@@ -7,7 +7,10 @@ import (
 	"os"
 	"sync"
 	"strings"
+	"unsafe"
 )
+
+const IntSize = int(unsafe.Sizeof(int(1)))
 /*
 BLOCK DEFINITION
 Create a reference to the blknumth block in Filename
@@ -53,28 +56,36 @@ func NewPageFromBytes(bytes []byte) *Page {
 	return &Page{data: bytes}
 }
 
+func bytesToInt(b []byte) int64 {
+	v := binary.LittleEndian.Uint64(b)
+	return int64(v)
+}
+
 func (p *Page) GetInt(offset int) int {
 	return int(binary.BigEndian.Uint32(p.data[offset:]))
 }
 
 func (p *Page) GetBytes(offset int) []byte {
-	return p.data[offset:offset + length]
+	start := offset + IntSize
+	length := bytesToInt(p.data)
+	return p.data[start:start + int(length)]
 }
 
 func (p *Page) GetString(offset int) string {
-	return string(p.data[offset:offset + length])
+	return string(p.GetBytes(offset))
 }
 
 func (p *Page) SetInt(offset int, val int) {
-	binary.BigEndian.PutUint32(p.data[offset:], uint32(val))
+	binary.LittleEndian.PutUint64(p.data[offset:], uint64(val))
 }
 
 func (p *Page) SetBytes(offset int, val []byte) {
-	copy(p.data[offset:], val)
+	binary.LittleEndian.PutUint64(p.data[offset:], uint64(len(val)))
+	copy(p.data[offset + IntSize:], val)
 }
 
 func (p *Page) SetString(offset int, val string) {
-	copy(p.data[offset:], []byte(val))
+	p.SetBytes(offset, []byte(val))
 }
 
 func (p *Page) MaxLength(strlen int) int {
