@@ -29,7 +29,7 @@ func (b *BlockId) Equals(other *BlockId) bool {
 }
 
 func (b *BlockId) String() string {
-	return fmt.Sprintf("[%s, block %d]",b.Filename, b.Blknum)
+	return fmt.Sprintf("[%s, block %d]",b.filename, b.blknum)
 }
 
 func (b *BlockId) Filename() string {
@@ -46,10 +46,11 @@ PAGE DEFINITION
 
 type Page struct {
 	data []byte
+	pagesize int
 }
 
 func NewPage(blocksize int) *Page {
-	return &Page{data: make([]byte, blocksize)}
+	return &Page{data: make([]byte, blocksize), pagesize: blocksize}
 }
 
 func NewPageFromBytes(bytes []byte) *Page {
@@ -62,12 +63,12 @@ func bytesToInt(b []byte) int64 {
 }
 
 func (p *Page) GetInt(offset int) int {
-	return int(binary.BigEndian.Uint32(p.data[offset:]))
+	return int(binary.LittleEndian.Uint64(p.data[offset:]))
 }
 
 func (p *Page) GetBytes(offset int) []byte {
 	start := offset + IntSize
-	length := bytesToInt(p.data)
+	length := bytesToInt(p.data[offset:start])
 	return p.data[start:start + int(length)]
 }
 
@@ -75,21 +76,44 @@ func (p *Page) GetString(offset int) string {
 	return string(p.GetBytes(offset))
 }
 
-func (p *Page) SetInt(offset int, val int) {
-	binary.LittleEndian.PutUint64(p.data[offset:], uint64(val))
+func (p *Page) outOfBounds(offset int, size int) bool {
+	nextPos := offset + size
+	if nextPos > p.pagesize {
+		return true
+	}
+	return false
 }
 
-func (p *Page) SetBytes(offset int, val []byte) {
+func (p *Page) SetInt(offset int, val int) error {
+	check := p.outOfBounds(offset, IntSize)
+
+	if check {
+		return fmt.Errorf("SetInt error: offset %d exceeds page size %d", offset, p.pagesize)
+	}
+
+	binary.LittleEndian.PutUint64(p.data[offset:], uint64(val))
+	return nil
+}
+
+func (p *Page) SetBytes(offset int, val []byte) error {
+
+	check := p.outOfBounds(offset, IntSize + len(val))
+
+	if check {
+		return fmt.Errorf("SetBytes error: offset %d exceeds block size %d", offset, p.pagesize)
+	}
+
 	binary.LittleEndian.PutUint64(p.data[offset:], uint64(len(val)))
 	copy(p.data[offset + IntSize:], val)
+	return nil
 }
 
-func (p *Page) SetString(offset int, val string) {
-	p.SetBytes(offset, []byte(val))
+func (p *Page) SetString(offset int, val string) error {
+	return p.SetBytes(offset, []byte(val))
 }
 
 func (p *Page) MaxLength(strlen int) int {
-	return strlen
+	return strlen + IntSize
 }
 
 /* FILE MANAGER DEFINITION */
@@ -109,20 +133,20 @@ func NewFileMgr(dbDirectoryName string, blocksize int) *FileMgr {
 		err := os.MkdirAll(dbDirectoryName, os.ModePerm)
 
 		if err != nil {
-			fmt.Println("Failed to create directory: %v\n", err)
+			fmt.Printf("Failed to create directory: %v\n", err)
 			return nil
 		}
 
-		fmt.Println("Directory created:", dbDirectoryName)
+		fmt.Printf("Directory created: %s", dbDirectoryName)
 	} else if err != nil {
-		fmt.Println("Error checking existing directory: %v\n", err)
+		fmt.Printf("Error checking existing directory: %v\n", err)
 		return nil
 	}
 
 	dbDirectory, err := os.Open(dbDirectoryName)
 
 	if err != nil {
-		fmt.Println("Failed to open existing directory: %v\n", err)
+		fmt.Printf("Failed to open existing directory: %v\n", err)
 		return nil
 	}
 
@@ -130,6 +154,7 @@ func NewFileMgr(dbDirectoryName string, blocksize int) *FileMgr {
 
 	if err != nil {
 		fmt.Println("Error reading directory")
+		return nil
 	}
 
 	for _,file := range files {
@@ -138,9 +163,9 @@ func NewFileMgr(dbDirectoryName string, blocksize int) *FileMgr {
 			err := os.Remove(filePath)
 
 			if err != nil {
-				fmt.Println("Error deleting file %s", filePath)
+				fmt.Printf("Error deleting file %s", filePath)
 			} else {
-				fmt.Println("Deleted file %s", filePath)
+				fmt.Printf("Deleted file %s", filePath)
 			}
 		}
 	}
@@ -151,6 +176,9 @@ func NewFileMgr(dbDirectoryName string, blocksize int) *FileMgr {
 	}
 }
 
+func (f *FileMgr) Blocksize() int {
+	return f.blocksize
+}
 /*
 Read contents of blk into page
 */
