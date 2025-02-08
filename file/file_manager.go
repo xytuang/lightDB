@@ -1,4 +1,4 @@
-package file_manager
+package file
 
 
 import (
@@ -239,6 +239,26 @@ func (f *FileMgr) Write(blk *BlockId, page *Page) error {
 	return nil
 }
 
+func (f *FileMgr) CheckLength(filename string) (int, error) {
+	f.mu.Lock()
+
+	file, err := f.getDBFile(filename)
+
+	if err != nil {
+		f.mu.Unlock()
+		return 0, err
+	}
+
+	blkNum, err := f.Length(file)
+
+	if err != nil {
+		f.mu.Unlock()
+		return 0, err
+	}
+	f.mu.Unlock()
+	return blkNum, nil
+}
+
 func (f *FileMgr) Append(filename string) (*BlockId, error) {
 	f.mu.Lock()
 
@@ -276,6 +296,7 @@ func (f *FileMgr) Append(filename string) (*BlockId, error) {
 	f.mu.Unlock()
 	return blk, nil
 }
+
 
 func generateFilePath(directoryName string, filename string) string {
 	filePath := fmt.Sprintf("%s/%s", directoryName, filename)

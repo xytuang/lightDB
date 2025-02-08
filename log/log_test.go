@@ -1,4 +1,4 @@
-package log_manager
+package log
 
 import (
 	"testing"
