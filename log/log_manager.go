@@ -39,14 +39,20 @@ func NewLogMgr(fm *FileMgr, logfile string) *LogMgr {
 	return &LogMgr{fm: fm, logfile: logfile}
 }
 
+/**
+Returns log sequence number
+*/
 func (lm *LogMgr) Append(rec []byte) int {
 }
 
+/**
+Forces a specific log record to disk
+*/
 func (lm *LogMgr) Flush(lsn int) {
 }
 
-func (lm *logMgr) NewIterator() *Iterator[byte]{
-
+func (lm *logMgr) NewIterator() *GenericIterator[byte]{
+	return NewGenericIterator[byte]
 }
 
 
