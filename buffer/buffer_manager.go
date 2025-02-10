@@ -10,7 +10,7 @@ import (
 	"errors"
 )
 
-var MAX_SECONDS int = 10
+var MAX_SECONDS int = 2
 
 type BufferMgr struct {
 	bufferPool []*BufferHeader
@@ -19,7 +19,6 @@ type BufferMgr struct {
 }
 
 func NewBufferMgr(fm *file.FileMgr, lm *log.LogMgr, numBuffs int) *BufferMgr {
-	fmt.Println("Called NewBufferMgr")
 	bufferPool := make([]*BufferHeader, numBuffs)
 	for i := 0; i < numBuffs; i++ {
 		bufferPool[i] = NewBufferHeader(fm, lm)
@@ -49,12 +48,10 @@ func (bm *BufferMgr) FlushAll(txNum int) {
 
 func (bm *BufferMgr) Unpin(buff *BufferHeader) {
 	bm.mu.Lock()
-	fmt.Printf("Trying to unpin block: %d\n", buff.Block().Blknum())
 	buff.Unpin()
 
 	if !buff.IsPinned() {
 		bm.numAvailable.Add(1)
-		//TODO: go waitqueue
 	}
 	bm.mu.Unlock()
 }
@@ -66,12 +63,10 @@ If blk is not pinned after that duration, return an error
 */
 func (bm *BufferMgr) Pin(blk *file.BlockId) (*BufferHeader, error) {
 	bm.mu.Lock()
-	fmt.Printf("Pin block: %d\n", blk.Blknum())
 	start := time.Now()
 	buff := bm.tryToPin(blk)
 
 	for buff == nil && !bm.waitingTooLong(start) {
-		fmt.Println("going to sleep...")
 		bm.mu.Unlock()
 		time.Sleep(time.Duration(MAX_SECONDS) * time.Second)
 		bm.mu.Lock()
@@ -94,7 +89,6 @@ func (bm *BufferMgr) waitingTooLong(start time.Time) bool {
 This function is always called with bm.mu locked
 */
 func (bm *BufferMgr) tryToPin(blk *file.BlockId) *BufferHeader {
-	fmt.Printf("Trying to pin block: %d\n", blk.Blknum())
 	buff := bm.findExistingBuffer(blk)
 
 	if buff == nil {
