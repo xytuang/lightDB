@@ -46,8 +46,8 @@ func (bh *BufferHeader) ModifyingTx() int {
 	return bh.txNum
 }
 
-func (bh *BufferHeader) assignToBlock(b *file.BlockId) {
-	bh.flush()
+func (bh *BufferHeader) AssignToBlock(b *file.BlockId) {
+	bh.Flush()
 	bh.blk = b
 	bh.fm.Read(b, bh.contents)
 	bh.pins = 0
@@ -60,7 +60,7 @@ we assume that the page to be flushed is already unpinned.
 
 Choosing a buffer to replace (aka unpinned buffer) is dealt with by the BufferManager and not the BufferHeader
 */
-func (bh *BufferHeader) flush() {
+func (bh *BufferHeader) Flush() {
 	if bh.txNum >= 0 {
 		bh.lm.Flush(bh.lsn)
 		bh.fm.Write(bh.blk, bh.contents)
