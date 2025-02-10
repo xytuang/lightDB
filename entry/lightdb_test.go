@@ -2,7 +2,6 @@ package entry
 
 import (
 	"testing"
-	"unsafe"
 	"fmt"
 	"lightDB/file"
 	"lightDB/log"
@@ -29,10 +28,11 @@ func createRecords(lm *log.LogMgr, start int, end int) {
 }
 
 func createLogRecord(s string, n int) []byte {
-	b := make([]byte, len(s) + int(unsafe.Sizeof(int64(0))) + 8)
+	numBytes := file.MaxLength(len(s)) + 8
+	b := make([]byte, numBytes)
 	page := file.NewPageFromBytes(b)
 	page.SetString(0, s)
-	page.SetInt(len(s) + 8, n)
+	page.SetInt(file.MaxLength(len(s)), n)
 	return b
 }
 
@@ -44,7 +44,7 @@ func printLogRecords(lm *log.LogMgr, s string) {
 		rec := it.Next()
 		p := file.NewPageFromBytes(rec)
 		recString := p.GetString(0)
-		npos := len(recString) + 8
+		npos := file.MaxLength(len(recString))
 		val := p.GetInt(npos)
 		fmt.Printf("[ %s , %d]", recString, val)
 	}

@@ -34,6 +34,11 @@ func (it *LogIterator) HasNext() bool {
 	return it.currentPos < it.fm.Blocksize() || it.blk.Blknum() > 0
 }
 
+/**
+On initialization, byte 0 contains the position of the rec closest to the start
+Value at byte 0 gets stored in it.currentPos
+Everytime Next() is called, we increment currentPos by len of rec just read + 8 (moving pointer right)
+*/
 func (it *LogIterator) Next() []byte {
 	if it.currentPos == it.fm.Blocksize() {
 		/**
@@ -105,7 +110,9 @@ func NewLogMgr(fm *file.FileMgr, logfile string) (*LogMgr, error) {
 
 
 /**
-Returns log sequence number of new record rec
+Appends logrec to logpage and returns LSN of logrec
+NOTE: The log manager does not append the LSN to logrec automatically!
+It is on the function that creates log records to include some LSN
 */
 func (lm *LogMgr) Append(logrec []byte) int {
 	lm.mu.Lock()

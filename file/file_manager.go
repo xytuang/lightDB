@@ -112,7 +112,7 @@ func (p *Page) SetString(offset int, val string) error {
 	return p.SetBytes(offset, []byte(val))
 }
 
-func (p *Page) MaxLength(strlen int) int {
+func MaxLength(strlen int) int {
 	return strlen + IntSize
 }
 
@@ -237,6 +237,13 @@ func (f *FileMgr) Write(blk *BlockId, page *Page) error {
 		f.mu.Unlock()
 		return err
 	}
+	err = file.Sync()
+
+	if err != nil {
+		f.mu.Unlock()
+		return err
+	}
+
 	f.mu.Unlock()
 	return nil
 }
