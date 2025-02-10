@@ -6,11 +6,13 @@ import (
 	"os"
 	"lightDB/file"
 	"lightDB/log"
+	"lightDB/buffer"
 )
 
 type LightDB struct {
 	fm *file.FileMgr
 	lm *log.LogMgr
+	bm *buffer.BufferMgr
 }
 
 func StartLightDB(dbDirectoryName string, blocksize int, numblocks int) *LightDB {
@@ -30,11 +32,14 @@ func StartLightDB(dbDirectoryName string, blocksize int, numblocks int) *LightDB
 
 	lm, _ := log.NewLogMgr(fm, "logfile")
 
-
-
-	return &LightDB{fm: fm, lm: lm}
+	bm := buffer.NewBufferMgr(fm, lm, numblocks)
+	return &LightDB{fm: fm, lm: lm, bm: bm}
 }
 
 func (db *LightDB) LogMgr() *log.LogMgr {
 	return db.lm
+}
+
+func (db *LightDB) BufferMgr() *buffer.BufferMgr {
+	return db.bm
 }

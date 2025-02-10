@@ -3,6 +3,7 @@ package buffer
 import (
 	"lightDB/file"
 	"lightDB/log"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -18,6 +19,7 @@ type BufferMgr struct {
 }
 
 func NewBufferMgr(fm *file.FileMgr, lm *log.LogMgr, numBuffs int) *BufferMgr {
+	fmt.Println("Called NewBufferMgr")
 	bufferPool := make([]*BufferHeader, numBuffs)
 	for i := 0; i < numBuffs; i++ {
 		bufferPool[i] = NewBufferHeader(fm, lm)
@@ -47,6 +49,7 @@ func (bm *BufferMgr) FlushAll(txNum int) {
 
 func (bm *BufferMgr) Unpin(buff *BufferHeader) {
 	bm.mu.Lock()
+	fmt.Printf("Trying to unpin block: %d\n", buff.Block().Blknum())
 	buff.Unpin()
 
 	if !buff.IsPinned() {
@@ -63,10 +66,12 @@ If blk is not pinned after that duration, return an error
 */
 func (bm *BufferMgr) Pin(blk *file.BlockId) (*BufferHeader, error) {
 	bm.mu.Lock()
+	fmt.Printf("Pin block: %d\n", blk.Blknum())
 	start := time.Now()
 	buff := bm.tryToPin(blk)
 
 	for buff == nil && !bm.waitingTooLong(start) {
+		fmt.Println("going to sleep...")
 		bm.mu.Unlock()
 		time.Sleep(time.Duration(MAX_SECONDS) * time.Second)
 		bm.mu.Lock()
@@ -77,7 +82,7 @@ func (bm *BufferMgr) Pin(blk *file.BlockId) (*BufferHeader, error) {
 		bm.mu.Unlock()
 		return nil, errors.New("No available page in buffer pool!")
 	}
-
+	bm.mu.Unlock()
 	return buff, nil
 }
 
@@ -89,6 +94,7 @@ func (bm *BufferMgr) waitingTooLong(start time.Time) bool {
 This function is always called with bm.mu locked
 */
 func (bm *BufferMgr) tryToPin(blk *file.BlockId) *BufferHeader {
+	fmt.Printf("Trying to pin block: %d\n", blk.Blknum())
 	buff := bm.findExistingBuffer(blk)
 
 	if buff == nil {
@@ -114,11 +120,11 @@ func (bm *BufferMgr) findExistingBuffer(blk *file.BlockId) *BufferHeader {
 	for i := 0; i < len(bm.bufferPool); i++ {
 		b := bm.bufferPool[i].Block()
 
-		if b == nil {
+		if b == nil{
 			continue
 		}
 
-		if blk == b {
+		if blk.Blknum() == b.Blknum() {
 			return bm.bufferPool[i]
 		}
 	}

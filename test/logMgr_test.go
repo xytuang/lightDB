@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"lightDB/file"
 	"lightDB/log"
+	"lightDB/entry"
 )
 
-func TestLightDB(t *testing.T) {
-	db := StartLightDB("logtest", 400, 8)
+func TestLogMgr(t *testing.T) {
+	db := entry.StartLightDB("logtest", 400, 8)
 	lm := db.LogMgr()
 
 	createRecords(lm, 1 , 35)
