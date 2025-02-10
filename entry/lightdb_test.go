@@ -29,10 +29,10 @@ func createRecords(lm *log.LogMgr, start int, end int) {
 }
 
 func createLogRecord(s string, n int) []byte {
-	b := make([]byte, len(s) + int(unsafe.Sizeof(int64(0))))
+	b := make([]byte, len(s) + int(unsafe.Sizeof(int64(0))) + 8)
 	page := file.NewPageFromBytes(b)
 	page.SetString(0, s)
-	page.SetInt(len(s), n)
+	page.SetInt(len(s) + 8, n)
 	return b
 }
 
@@ -44,7 +44,7 @@ func printLogRecords(lm *log.LogMgr, s string) {
 		rec := it.Next()
 		p := file.NewPageFromBytes(rec)
 		recString := p.GetString(0)
-		npos := len(recString)
+		npos := len(recString) + 8
 		val := p.GetInt(npos)
 		fmt.Printf("[ %s , %d]", recString, val)
 	}
