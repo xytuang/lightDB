@@ -1,33 +1,40 @@
-package lightdb
-
+package entry
 
 import (
 	"bufio"
 	"fmt"
 	"os"
+	"lightDB/file"
+	"lightDB/log"
 )
 
 type LightDB struct {
-	fm *FileManager
-	lm *LogManager
+	fm *file.FileMgr
+	lm *log.LogMgr
 }
 
 func StartLightDB(dbDirectoryName string, blocksize int, numblocks int) *LightDB {
-	fm := NewFileMgr(dbDirectoryName, blocksize)
+	fm := file.NewFileMgr(dbDirectoryName, blocksize)
 
 	/**
 	Keep prompting user until we set up a valid FileMgr
 	*/
-	while (fm == nil) {
-		fmt.Println("%s is not a valid directory", dbDirectoryName)
+	for fm == nil {
+		fmt.Printf("%s is not a valid directory", dbDirectoryName)
 		fmt.Println("Enter another directory")
 		reader := bufio.NewReader(os.Stdin)
 		dbDirectoryName, _ = reader.ReadString('\n')
 		dbDirectoryName = dbDirectoryName[:len(dbDirectoryName) - 1]
-		fm = NewFileMgr(dbDirectoryName, blocksize)
+		fm = file.NewFileMgr(dbDirectoryName, blocksize)
 	}
 
-	lm := NewLogMgr(fm, "logfile")
+	lm, _ := log.NewLogMgr(fm, "logfile")
+
+
 
 	return &LightDB{fm: fm, lm: lm}
+}
+
+func (db *LightDB) LogMgr() *log.LogMgr {
+	return db.lm
 }

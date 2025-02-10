@@ -149,7 +149,7 @@ func (lm *LogMgr) Flush(lsn int) {
 	}
 }
 
-func (lm *LogMgr) Iterator() *LogIterator {
+func (lm *LogMgr) NewIterator() *LogIterator {
 	lm.flush()
 	return NewLogIterator(lm.fm, lm.currentBlk)
 }
