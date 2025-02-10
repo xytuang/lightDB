@@ -54,7 +54,7 @@ func NewPage(blocksize int) *Page {
 }
 
 func NewPageFromBytes(bytes []byte) *Page {
-	return &Page{data: bytes}
+	return &Page{data: bytes, pagesize: len(bytes)}
 }
 
 func bytesToInt(b []byte) int64 {
@@ -221,7 +221,9 @@ func (f *FileMgr) Write(blk *BlockId, page *Page) error {
 		f.mu.Unlock()
 		return err
 	}
-
+	/**
+	Seek to first byte of blk
+	*/
 	_, err = file.Seek(int64(blk.Blknum()) * int64(f.blocksize), 0)
 
 	if err != nil {
