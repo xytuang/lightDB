@@ -67,14 +67,12 @@ func (checkpointRec *CheckPointRecord) Undo(txnum int) {
 }
 
 
-func (CheckPointRecord) WriteToLog(lm *log.LogMgr, txnum int, blk *file.BlockId, offset int, val int) {
-	tpos := file.IntSize
-
-	reclen := tpos + file.IntSize
+func (CheckPointRecord) WriteToLog(lm *log.LogMgr) int {
+	reclen := file.IntSize
 	bytes := make([]byte, reclen)
 	page := file.NewPageFromBytes(bytes)
 	page.SetInt(0, LogRecordOps["CHECKPOINT"])
-	page.SetInt(tpos, txnum)
+	return lm.Append(bytes)
 }
 
 /*
@@ -102,7 +100,7 @@ func (startRec *StartRecord) GetTxnum() int {
 func (startRec *StartRecord) Undo(txnum int) {
 }
 
-func (StartRecord) WriteToLog(lm *log.LogMgr, txnum int, blk *file.BlockId, offset int, val int) {
+func (StartRecord) WriteToLog(lm *log.LogMgr, txnum int) int {
 	tpos := file.IntSize
 
 	reclen := tpos + file.IntSize
@@ -110,6 +108,7 @@ func (StartRecord) WriteToLog(lm *log.LogMgr, txnum int, blk *file.BlockId, offs
 	page := file.NewPageFromBytes(bytes)
 	page.SetInt(0, LogRecordOps["START"])
 	page.SetInt(tpos, txnum)
+	return lm.Append(bytes)
 }
 /*
 COMMIT DEFINITION
@@ -136,7 +135,7 @@ func (commitRec *CommitRecord) GetTxnum() int {
 func (commitRec *CommitRecord) Undo(txnum int) {
 }
 
-func (CommitRecord) WriteToLog(lm *log.LogMgr, txnum int, blk *file.BlockId, offset int, val int) {
+func (CommitRecord) WriteToLog(lm *log.LogMgr, txnum int) int {
 	tpos := file.IntSize
 
 	reclen := tpos + file.IntSize
@@ -144,6 +143,8 @@ func (CommitRecord) WriteToLog(lm *log.LogMgr, txnum int, blk *file.BlockId, off
 	page := file.NewPageFromBytes(bytes)
 	page.SetInt(0, LogRecordOps["COMMIT"])
 	page.SetInt(tpos, txnum)
+
+	return lm.Append(bytes)
 }
 /*
 ROLLBACK DEFINITION
@@ -170,7 +171,7 @@ func (rollbackRec *RollbackRecord) GetTxnum() int {
 func (rollbackRec *RollbackRecord) Undo(txnum int) {
 }
 
-func (RollbackRecord) WriteToLog(lm *log.LogMgr, txnum int, blk *file.BlockId, offset int, val int) {
+func (RollbackRecord) WriteToLog(lm *log.LogMgr, txnum int) int {
 	tpos := file.IntSize
 
 	reclen := tpos + file.IntSize
@@ -178,6 +179,8 @@ func (RollbackRecord) WriteToLog(lm *log.LogMgr, txnum int, blk *file.BlockId, o
 	page := file.NewPageFromBytes(bytes)
 	page.SetInt(0, LogRecordOps["ROLLBACK"])
 	page.SetInt(tpos, txnum)
+
+	return lm.Append(bytes)
 }
 
 /*
@@ -217,7 +220,7 @@ func (setIntRec *SetIntRecord) Undo(txnum int) {
 }
 
 
-func (SetIntRecord) WriteToLog(lm *log.LogMgr, txnum int, blk *file.BlockId, offset int, val int) {
+func (SetIntRecord) WriteToLog(lm *log.LogMgr, txnum int, blk *file.BlockId, offset int, val int) int {
 	tpos := file.IntSize
 	fpos := tpos + file.IntSize
 	blkpos := fpos + file.MaxLength(len(blk.Filename()))
@@ -233,6 +236,8 @@ func (SetIntRecord) WriteToLog(lm *log.LogMgr, txnum int, blk *file.BlockId, off
 	page.SetInt(blkpos, blk.Blknum())
 	page.SetInt(offsetpos, offset)
 	page.SetInt(valpos, val)
+
+	return lm.Append(bytes)
 }
 
 
@@ -274,7 +279,7 @@ func (setStringRec *SetStringRecord) GetTxnum() int {
 func (setStringRec *SetStringRecord) Undo(txnum int) {
 }
 
-func (SetStringRecord) WriteToLog(lm *log.LogMgr, txnum int, blk *file.BlockId, offset int, val string) {
+func (SetStringRecord) WriteToLog(lm *log.LogMgr, txnum int, blk *file.BlockId, offset int, val string) int {
 	tpos := file.IntSize
 	fpos := tpos + file.IntSize
 	blkpos := fpos + file.MaxLength(len(blk.Filename()))
@@ -290,5 +295,7 @@ func (SetStringRecord) WriteToLog(lm *log.LogMgr, txnum int, blk *file.BlockId, 
 	page.SetInt(blkpos, blk.Blknum())
 	page.SetInt(offsetpos, offset)
 	page.SetString(valpos, val)
+
+	return lm.Append(bytes)
 }
 
