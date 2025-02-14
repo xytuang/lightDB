@@ -3,7 +3,6 @@ package buffer
 import (
 	"lightDB/file"
 	"lightDB/log"
-	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
