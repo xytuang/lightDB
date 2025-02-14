@@ -3,13 +3,13 @@ package buffer
 import (
 	"lightDB/file"
 	"lightDB/log"
+	"lightDB/common"
 	"sync"
 	"sync/atomic"
 	"time"
 	"errors"
 )
 
-var MAX_SECONDS int = 2
 
 type BufferMgr struct {
 	bufferPool []*BufferHeader
@@ -22,9 +22,9 @@ func NewBufferMgr(fm *file.FileMgr, lm *log.LogMgr, numBuffs int) *BufferMgr {
 	for i := 0; i < numBuffs; i++ {
 		bufferPool[i] = NewBufferHeader(fm, lm)
 	}
-	var numAvailable atomic.Int64
-	numAvailable.Store(int64(numBuffs))
-	return &BufferMgr{bufferPool: bufferPool, numAvailable: numAvailable}
+	bm :=  &BufferMgr{bufferPool: bufferPool}
+	bm.numAvailable.Store(int64(numBuffs))
+	return bm
 }
 
 /**
@@ -65,9 +65,9 @@ func (bm *BufferMgr) Pin(blk *file.BlockId) (*BufferHeader, error) {
 	start := time.Now()
 	buff := bm.tryToPin(blk)
 
-	for buff == nil && !bm.waitingTooLong(start) {
+	for buff == nil && !common.WaitingTooLong(start) {
 		bm.mu.Unlock()
-		time.Sleep(time.Duration(MAX_SECONDS) * time.Second)
+		time.Sleep(time.Duration(common.MAX_SECONDS) * time.Second)
 		bm.mu.Lock()
 		buff = bm.tryToPin(blk)
 	}
@@ -80,9 +80,6 @@ func (bm *BufferMgr) Pin(blk *file.BlockId) (*BufferHeader, error) {
 	return buff, nil
 }
 
-func (bm *BufferMgr) waitingTooLong(start time.Time) bool {
-	return time.Since(start) > (time.Duration(MAX_SECONDS) * time.Second)
-}
 
 /**
 This function is always called with bm.mu locked
