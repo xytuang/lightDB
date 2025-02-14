@@ -17,7 +17,8 @@ var LogRecordOps = map[string]int {
 type LogRecord interface {
 	Op() int
 	GetTxnum() int
-	Undo(txnum int)
+	Undo(tx *Transaction)
+	Redo(tx *Transaction)
 }
 
 func CreateLogRecord(bytes []byte) LogRecord {
@@ -63,9 +64,12 @@ func (checkpointRec *CheckPointRecord) GetTxnum() int {
 	return 0
 }
 
-func (checkpointRec *CheckPointRecord) Undo(txnum int) {
+func (checkpointRec *CheckPointRecord) Undo(tx *Transaction) {
 }
 
+
+func (checkpointRec *CheckPointRecord) Redo(tx *Transaction) {
+}
 
 func (CheckPointRecord) WriteToLog(lm *log.LogMgr) int {
 	reclen := file.IntSize
@@ -97,7 +101,10 @@ func (startRec *StartRecord) GetTxnum() int {
 	return startRec.txnum
 }
 
-func (startRec *StartRecord) Undo(txnum int) {
+func (startRec *StartRecord) Undo(tx *Transaction) {
+}
+
+func (startRec *StartRecord) Redo(tx *Transaction) {
 }
 
 func (StartRecord) WriteToLog(lm *log.LogMgr, txnum int) int {
@@ -132,7 +139,10 @@ func (commitRec *CommitRecord) GetTxnum() int {
 	return commitRec.txnum
 }
 
-func (commitRec *CommitRecord) Undo(txnum int) {
+func (commitRec *CommitRecord) Undo(tx *Transaction) {
+}
+
+func (commitRec *CommitRecord) Redo(tx *Transaction) {
 }
 
 func (CommitRecord) WriteToLog(lm *log.LogMgr, txnum int) int {
@@ -168,7 +178,10 @@ func (rollbackRec *RollbackRecord) GetTxnum() int {
 	return rollbackRec.txnum
 }
 
-func (rollbackRec *RollbackRecord) Undo(txnum int) {
+func (rollbackRec *RollbackRecord) Undo(tx *Transaction) {
+}
+
+func (rollbackRec *RollbackRecord) Redo(tx *Transaction) {
 }
 
 func (RollbackRecord) WriteToLog(lm *log.LogMgr, txnum int) int {
@@ -189,7 +202,8 @@ SET INT DEFINITION
 type SetIntRecord struct {
 	txnum int
 	offset int
-	val int
+	oldval int
+	newval int
 	blk *file.BlockId
 }
 
@@ -202,10 +216,12 @@ func NewSetIntRecord(page *file.Page) *SetIntRecord {
 	blknum := page.GetInt(blkpos)
 	offsetpos := blkpos + file.IntSize
 	offset := page.GetInt(offsetpos)
-	valpos := offsetpos + file.IntSize
-	val := page.GetInt(valpos)
+	oldvalpos := offsetpos + file.IntSize
+	oldval := page.GetInt(oldvalpos)
+	newvalpos := oldvalpos + file.IntSize
+	newval := page.GetInt(newvalpos)
 
-	return &SetIntRecord{txnum: txnum, offset: offset, val: val, blk: file.NewBlock(filename, blknum) }
+	return &SetIntRecord{txnum: txnum, offset: offset, oldval: oldval, newval:newval, blk: file.NewBlock(filename, blknum) }
 }
 
 func (setIntRec *SetIntRecord) Op() int {
@@ -216,18 +232,27 @@ func (setIntRec *SetIntRecord) GetTxnum() int {
 	return setIntRec.txnum
 }
 
-func (setIntRec *SetIntRecord) Undo(txnum int) {
+func (setIntRec *SetIntRecord) Undo(tx *Transaction) {
+	tx.Pin(setIntRec.blk)
+	tx.SetInt(setIntRec.blk, setIntRec.offset, setIntRec.oldval, true)
+	tx.Unpin(setIntRec.blk)
 }
 
+func (setIntRec *SetIntRecord) Redo(tx *Transaction) {
+	tx.Pin(setIntRec.blk)
+	tx.SetInt(setIntRec.blk, setIntRec.offset, setIntRec.newval, true)
+	tx.Unpin(setIntRec.blk)
+}
 
-func (SetIntRecord) WriteToLog(lm *log.LogMgr, txnum int, blk *file.BlockId, offset int, val int) int {
+func (SetIntRecord) WriteToLog(lm *log.LogMgr, txnum int, blk *file.BlockId, offset int, oldval int, newval int) int {
 	tpos := file.IntSize
 	fpos := tpos + file.IntSize
 	blkpos := fpos + file.MaxLength(len(blk.Filename()))
 	offsetpos := blkpos + file.IntSize
-	valpos := offsetpos + file.IntSize
+	oldvalpos := offsetpos + file.IntSize
+	newvalpos := oldvalpos + file.IntSize
 
-	reclen := valpos + file.IntSize
+	reclen := newvalpos + file.IntSize
 	bytes := make([]byte, reclen)
 	page := file.NewPageFromBytes(bytes)
 	page.SetInt(0, LogRecordOps["SETINT"])
@@ -235,7 +260,8 @@ func (SetIntRecord) WriteToLog(lm *log.LogMgr, txnum int, blk *file.BlockId, off
 	page.SetString(fpos, blk.Filename())
 	page.SetInt(blkpos, blk.Blknum())
 	page.SetInt(offsetpos, offset)
-	page.SetInt(valpos, val)
+	page.SetInt(oldvalpos, oldval)
+	page.SetInt(newvalpos, newval)
 
 	return lm.Append(bytes)
 }
@@ -249,7 +275,8 @@ SET STRING DEFINTION
 type SetStringRecord struct {
 	txnum int
 	offset int
-	val string
+	oldval string
+	newval string
 	blk *file.BlockId
 }
 
@@ -262,10 +289,12 @@ func NewSetStringRecord(page *file.Page) *SetStringRecord {
 	blknum := page.GetInt(blkpos)
 	offsetpos := blkpos + file.IntSize
 	offset := page.GetInt(offsetpos)
-	valpos := offsetpos + file.IntSize
-	val := page.GetString(valpos)
+	oldvalpos := offsetpos + file.IntSize
+	oldval := page.GetString(oldvalpos)
+	newvalpos := offsetpos + file.IntSize
+	newval := page.GetString(newvalpos)
 
-	return &SetStringRecord{txnum: txnum, offset: offset, val: val, blk: file.NewBlock(filename, blknum) }
+	return &SetStringRecord{txnum: txnum, offset: offset, oldval: oldval, newval: newval, blk: file.NewBlock(filename, blknum) }
 }
 
 func (setStringRec *SetStringRecord) Op() int {
@@ -276,17 +305,29 @@ func (setStringRec *SetStringRecord) GetTxnum() int {
 	return setStringRec.txnum
 }
 
-func (setStringRec *SetStringRecord) Undo(txnum int) {
+func (setStringRec *SetStringRecord) Undo(tx *Transaction) {
+	tx.Pin(setStringRec.blk)
+	tx.SetString(setStringRec.blk, setStringRec.offset, setStringRec.oldval, true)
+	tx.Unpin(setStringRec.blk)
 }
 
-func (SetStringRecord) WriteToLog(lm *log.LogMgr, txnum int, blk *file.BlockId, offset int, val string) int {
+func (setStringRec *SetStringRecord) Redo(tx *Transaction) {
+	tx.Pin(setStringRec.blk)
+	tx.SetString(setStringRec.blk, setStringRec.offset, setStringRec.newval, true)
+	tx.Unpin(setStringRec.blk)
+}
+
+func (SetStringRecord) WriteToLog(lm *log.LogMgr, txnum int, blk *file.BlockId, offset int, oldval string, newval string) int {
 	tpos := file.IntSize
 	fpos := tpos + file.IntSize
 	blkpos := fpos + file.MaxLength(len(blk.Filename()))
 	offsetpos := blkpos + file.IntSize
-	valpos := offsetpos + file.IntSize
+	oldvalpos := offsetpos + file.IntSize
+	newvalpos := oldvalpos + file.MaxLength(len(oldval))
 
-	reclen := valpos + file.MaxLength(len(val))
+
+	reclen := newvalpos + file.MaxLength(len(newval))
+
 	bytes := make([]byte, reclen)
 	page := file.NewPageFromBytes(bytes)
 	page.SetInt(0, LogRecordOps["SETSTRING"])
@@ -294,7 +335,8 @@ func (SetStringRecord) WriteToLog(lm *log.LogMgr, txnum int, blk *file.BlockId, 
 	page.SetString(fpos, blk.Filename())
 	page.SetInt(blkpos, blk.Blknum())
 	page.SetInt(offsetpos, offset)
-	page.SetString(valpos, val)
+	page.SetString(oldvalpos, oldval)
+	page.SetString(newvalpos, newval)
 
 	return lm.Append(bytes)
 }
