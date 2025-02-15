@@ -1,6 +1,7 @@
 package transactions
 
 import (
+	"context"
 	"errors"
 	"lightDB/common"
 	"lightDB/file"
@@ -21,60 +22,48 @@ func NewLockTable() *LockTable {
 	return lockTable
 }
 
-func (lockTable *LockTable) SLock(blk *file.BlockId) error {
-	lockTable.mu.Lock()
-	defer lockTable.mu.Unlock()
+func (lockTable *LockTable) SLock(blk *file.BlockId, ctx context.Context) error {
+	ticker := time.NewTicker(common.POLL_INTERVAL)
+	defer ticker.Stop()
 
-	start := time.Now()
-	var success bool
-	success = false
 	for {
-		if (lockTable.hasXLock(blk) && !common.WaitingTooLong(start)) {
-			lockTable.cond.Wait()
+		lockTable.mu.Lock()
+		if (!lockTable.hasXLock(blk)) {
+			val := lockTable.getLockVal(blk)
+			lockTable.locks[blk] = val + 1
+			lockTable.mu.Unlock()
+			return nil
+		}
+		lockTable.mu.Unlock()
+		select {
+		case <-ctx.Done():
+			return errors.New("SLock not available")
+		case <-ticker.C:
 		}
 
-		if (lockTable.hasXLock(blk)) {
-			break
-		}
-
-		val := lockTable.getLockVal(blk)
-		lockTable.locks[blk] = val + 1
-		success = true
-		break
 	}
-
-	if !success {
-		return errors.New("SLock not available")
-	}
-	return nil
 }
 
 
-func (lockTable *LockTable) XLock(blk *file.BlockId) error {
-	lockTable.mu.Lock()
-	defer lockTable.mu.Unlock()
+func (lockTable *LockTable) XLock(blk *file.BlockId, ctx context.Context) error {
+	ticker := time.NewTicker(common.POLL_INTERVAL)
+	defer ticker.Stop()
 
-	start := time.Now()
-	var success bool
-	success = false
 	for {
-		if (lockTable.hasOtherSLocks(blk) && !common.WaitingTooLong(start)) {
-			lockTable.cond.Wait()
+		lockTable.mu.Lock()
+		if (!lockTable.hasOtherSLocks(blk)) {
+			lockTable.locks[blk] = -1
+			lockTable.mu.Unlock()
+			return nil
+		}
+		lockTable.mu.Unlock()
+		select {
+		case <-ctx.Done():
+			return errors.New("XLock not available")
+		case <-ticker.C:
 		}
 
-		if (lockTable.hasOtherSLocks(blk)) {
-			break
-		}
-
-		lockTable.locks[blk] = -1
-		success = true
-		break
 	}
-
-	if !success {
-		return errors.New("XLock not available")
-	}
-	return nil
 }
 
 func (lockTable *LockTable) Unlock(blk *file.BlockId) {
