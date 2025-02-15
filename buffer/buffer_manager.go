@@ -62,6 +62,7 @@ If blk is not pinned after that duration, return an error
 */
 func (bm *BufferMgr) Pin(blk *file.BlockId) (*BufferHeader, error) {
 	bm.mu.Lock()
+
 	start := time.Now()
 	buff := bm.tryToPin(blk)
 
