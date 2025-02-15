@@ -62,7 +62,7 @@ func (concurrencyMgr *ConcurrencyMgr) XLock(blk *file.BlockId) error {
 }
 
 func (concurrencyMgr *ConcurrencyMgr) Release(blk *file.BlockId) {
-	for blk, _ := range concurrencyMgr.locks {
+	for blk := range concurrencyMgr.locks {
 		locktable.Unlock(blk)
 	}
 }
