@@ -77,8 +77,9 @@ func (tx *Transaction) SetInt(blk *file.BlockId, offset int, val int, okToLog bo
 	lsn := -1
 
 	buff := tx.buffers.GetBuffer(blk)
+	oldval := buff.Contents().GetInt(offset)
 	if okToLog {
-		lsn = tx.rm.SetString(buff, offset, val)
+		lsn = tx.rm.SetInt(buff, offset, oldval, val)
 	}
 
 	p := buff.Contents()
