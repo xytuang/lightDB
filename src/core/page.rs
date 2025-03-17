@@ -62,8 +62,8 @@ impl Page {
         self.set_bytes(offset, bytes);
     }
 
-    pub(crate) fn contents(&self) -> &[u8] {
-        &self.buffer;
+    pub(crate) fn contents(&self) -> &mut [u8] {
+        &mut self.buffer;
     }
 
 }

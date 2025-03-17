@@ -30,10 +30,5 @@ impl Hash for Block {
     }
 }
 
-impl fmt::Display for Block {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Block: {}, {}", self.fname, self.blknum)
-    }
-}
 
 

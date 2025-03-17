@@ -1,5 +1,6 @@
 use crate::core::{FileMgr, Block, Page};
-use std::fs::{self,File};
+use crate::error::Error;
+use std::fs::{self,File, OpenOptions};
 use std::path::PathBuf;
 
 impl FileMgr {
@@ -21,7 +22,7 @@ impl FileMgr {
             }
         }
 
-        let open_files: HashMap<String, File> = HashMap::new();
+        let open_files: RwLock<HashMap<String, Arc<RwLock<File>>>> = RwLock::new(HashMap::new());
 
         FileMgr {
             db_directory,
@@ -31,29 +32,98 @@ impl FileMgr {
         }
     }
     //Reads contents of blk into p
-    pub fn read(&self, blk: &Block, p: &mut Page) -> () {
+    pub fn read(&self, blk: &Block, p: &mut Page) -> Result<(), Error> {
+        if let Ok(file) = self.get_file(blk.get_fname()) {
+            let f = file.read().map_err(|e| Error::LockPoisoned(e))?;
 
+            f.seek(blk.get_blknum() * self.blocksize).map_err(|e| Error::SeekFailed(e))?;
+            f.read(p.contents()).map_err(|e| Error::ReadFailed(e))?;
+
+            Ok(())
+        } else {
+            Err(Error::FileNotFound)
+        }
     }
 
     //Writes contents of p to blk
-    pub fn write(&self, blk: &mut Block, p: &Page) -> () {
+    pub fn write(&self, blk: &mut Block, p: &Page) -> Result<(), Error> {
+        if let Ok(file) = self.get_file(blk.get_fname()) {
+            let f = file.write().map_err(|e| Error::LockPoisoned(e))?;
 
+            f.seek(blk.get_blknum() * self.blocksize).map_err(|e| Error::SeekFailed(e))?;
+            f.write(p.contents()).map_err(|e| Error::WriteFailed(e))?;
+
+            Ok(())
+        } else {
+            Err(Error::FileNotFound)
+        }
     }
 
-    pub fn append(&self, fname: String) -> Block {
+    pub fn append(&self, fname: &str) -> Result<Block, Error> {
+        let new_blknum = self.get_num_blocks(fname);
+        let blk = Block::new(fname, new_blknum);
 
+        if let Ok(file) = self.get_file(blk.get_fname()) {
+            let f = file.write().map_err(|e| Error::LockPoisoned(e))?;
+
+            f.seek(blk.get_blknum() * self.blocksize).map_err(|e| Error::SeekFailed(e))?;
+
+            let vec: Vec<u8>  = vec![0; self.blocksize];
+            let b: &[u8] = &vec;
+
+            f.write(b).map_err(|e| Error::WriteFailed(e))?;
+
+            Ok(blk)
+        } else {
+            Err(Error::FileNotFound)
+        }
     }
 
     //Returns true if new folder is created for database, false otherwise
     //Used to initialize database
     pub fn is_new(&self) -> bool {
+        return self.is_new;
     }
 
-    pub fn length(&self, fname: String) -> u32 {
+    //Returns number of blocks in file fname
+    pub fn get_num_blocks(&self, fname: &str) -> Result<u32, Error> {
 
+        if let Ok(file) = self.get_file(fname) {
+            let f = file.read().map_err(|e| Error::LockPoisoned(e))?;
+            let num_blocks: u32 = f.metadata().unwrap().len() / self.blocksize;
+
+            return Ok(num_blocks);
+
+        } else {
+            Err(Error::FileNotFound)
+        }
     }
 
     pub fn get_blocksize(&self) -> u32 {
+        return self.blocksize;
+    }
 
+    fn get_file(&self, fname: &str) -> Result<Arc<RwLock<File>>, Error> {
+        let mut files = self.open_files.write().unwrap();
+
+        if let Some(file) = files.get(fname) {
+            return Ok(file.clone());
+        } else {
+            let file_path = self.db_directory.join(fname);
+
+            match OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create(true)
+                .open(file_path.clone()) {
+                    Ok(file) => {
+                        let f = Arc::new(RwLock::new(file));
+
+                        files.insert(fname.to_string(), f.clone());
+                        return Ok(f);
+                    },
+                    Err(e) => Err(Error::FileCreationFailed(e))
+            }
+        }
     }
 }
