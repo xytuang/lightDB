@@ -3,7 +3,7 @@ use byteorder::{ByteOrder, LittleEndian};
 
 impl Page {
     pub fn new(blocksize: u32) -> Self {
-        Page {buffer: vec![0; blocksize]}
+        Page {buffer: vec![0; blocksize.try_into().unwrap()]}
     }
 
     pub fn new_bytes(buffer: Vec<u8>) -> Self {
@@ -62,8 +62,8 @@ impl Page {
         self.set_bytes(offset, bytes);
     }
 
-    pub(crate) fn contents(&self) -> &mut [u8] {
-        &mut self.buffer;
+    pub(crate) fn contents(&mut self) -> &mut [u8] {
+        return &mut self.buffer;
     }
 
 }

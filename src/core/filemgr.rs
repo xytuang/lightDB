@@ -1,7 +1,12 @@
-use crate::core::{FileMgr, Block, Page};
-use crate::error::Error;
+use crate::core::types::{FileMgr, Block, Page};
+use crate::error::error::Error;
 use std::fs::{self,File, OpenOptions};
 use std::path::PathBuf;
+use std::sync::{Arc, RwLock};
+use std::collections::HashMap;
+use std::io;
+use std::sync::PoisonError;
+use std::sync::RwLockReadGuard;
 
 impl FileMgr {
     pub fn new(db_directory: PathBuf, blocksize: u32) -> Self {
@@ -34,7 +39,7 @@ impl FileMgr {
     //Reads contents of blk into p
     pub fn read(&self, blk: &Block, p: &mut Page) -> Result<(), Error> {
         if let Ok(file) = self.get_file(blk.get_fname()) {
-            let f = file.read().map_err(|e| Error::LockPoisoned(e))?;
+            let f = file.read().map_err(|e: PoisonError<RwLockReadGuard<'_, File>>| { io::Error::new(io::ErrorKind::Other, e)})?;
 
             f.seek(blk.get_blknum() * self.blocksize).map_err(|e| Error::SeekFailed(e))?;
             f.read(p.contents()).map_err(|e| Error::ReadFailed(e))?;
@@ -60,15 +65,15 @@ impl FileMgr {
     }
 
     pub fn append(&self, fname: &str) -> Result<Block, Error> {
-        let new_blknum = self.get_num_blocks(fname);
-        let blk = Block::new(fname, new_blknum);
+        let new_blknum = self.get_num_blocks(fname)?;
+        let blk = Block::new(String::from(fname), new_blknum);
 
         if let Ok(file) = self.get_file(blk.get_fname()) {
             let f = file.write().map_err(|e| Error::LockPoisoned(e))?;
 
             f.seek(blk.get_blknum() * self.blocksize).map_err(|e| Error::SeekFailed(e))?;
 
-            let vec: Vec<u8>  = vec![0; self.blocksize];
+            let vec: Vec<u8>  = vec![0; self.blocksize.try_into().unwrap()];
             let b: &[u8] = &vec;
 
             f.write(b).map_err(|e| Error::WriteFailed(e))?;
@@ -90,7 +95,7 @@ impl FileMgr {
 
         if let Ok(file) = self.get_file(fname) {
             let f = file.read().map_err(|e| Error::LockPoisoned(e))?;
-            let num_blocks: u32 = f.metadata().unwrap().len() / self.blocksize;
+            let num_blocks: u32 = (f.metadata().unwrap().len()) as u32 / self.blocksize;
 
             return Ok(num_blocks);
 
