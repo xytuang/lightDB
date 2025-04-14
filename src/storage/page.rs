@@ -22,7 +22,7 @@ impl Page {
     pub fn get_int(&mut self, offset: u32) -> Option<u32> {
         self.buffer.set_rpos(offset as usize);
         let res = self.buffer.read_u32();
-        return res.ok()
+        return res.ok();
     }
 
     // Writes an int to this page
@@ -35,7 +35,7 @@ impl Page {
     pub fn get_string(&mut self, offset: u32) -> Option<String> {
         self.buffer.set_rpos(offset as usize);
         let res = self.buffer.read_string();
-        return res.ok()
+        return res.ok();
     }
 
     // Writes a string to this page
@@ -50,17 +50,16 @@ impl Page {
 
         return match opt {
             Some(x) => Some(x.into_bytes()),
-            None => None
-        }
+            None => None,
+        };
     }
 
     // Writes a string to this page
     pub fn set_bytes(&mut self, offset: u32, bytes: Vec<u8>) -> () {
         let string = String::from_utf8(bytes);
         if string.is_err() {
-            return
+            return;
         }
         self.set_string(offset, &string.unwrap())
     }
-    
 }
