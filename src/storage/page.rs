@@ -62,4 +62,9 @@ impl Page {
         }
         self.set_string(offset, &string.unwrap())
     }
+
+    // exposes buffer of this page for reading and writing
+    pub fn get_buffer(&mut self) -> &mut ByteBuffer {
+        return &mut self.buffer;
+    }
 }
